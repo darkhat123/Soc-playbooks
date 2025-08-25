@@ -126,9 +126,13 @@ Successful Login Event ID: 4624
 
 ## Identify all traffic related to RDP for a specific IP address
 Command Used: `ip.addr == 192.168.1.113 and tcp.port==3389`
+<img width="1878" height="409" alt="image" src="https://github.com/user-attachments/assets/7cefcee4-88ef-4a69-a759-38fd9c9d91fd" />
+
 
 ## Idenitfy only RDP Packets
 Command Used: `ip.addr==192.168.1.113 && rdp`
+<img width="1917" height="980" alt="image" src="https://github.com/user-attachments/assets/c28af69a-f3dc-4f69-b582-f035e98f7313" />
+
 
 With these two filters we can analyse the traffic and determine whats happening.
 A typical indicator of brute force attacks is a significant number of repeating RDP connections which are then quickly terminated, no other traffic follows. Whilst it is unknown whether the tool obtained
@@ -138,6 +142,7 @@ valid credentials this can be used to pivot to the affected user and gain contex
 To determine whether the brute force was successful in obtaining credentials we can use Hydras treatment of the closing of sessions with the server. All failed attempts will have a RST,ACK to politely close the session from the server to the client. Whilst all successful logins will immediately terminate the connection via the client using just the RST flag
 
 Command Used: `tcp.flags.reset == 1 and tcp.port == 3389`
+<img width="1913" height="925" alt="image" src="https://github.com/user-attachments/assets/93bec7a7-9d4c-462d-ad63-3c8102c22dde" />
 
 From windows 10 onwards even with NLA disabled policies enforce the use of encrypted TLS and therefore no credentials are transmitted over the network.
 
