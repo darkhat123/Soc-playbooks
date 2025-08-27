@@ -10,24 +10,27 @@ Purpose: Provide a structured response workflow for detecting and responding to 
 
 ## Log Sources:
 
-Windows Event Logs (4688, 4104, 4103)
-Sysmon Event ID 1 Process Creation
-Sysmon Event ID 3 Network Connection
-
-EDR/SIEM alerts
+    Windows Event Logs (4688, 4104, 4103)
+    Sysmon Event ID 1 Process Creation
+    Sysmon Event ID 3 Network Connection
+    EDR/SIEM alerts
 
 ## Detection Query (Lab Demo):
-`index="sysmon" EventID=1 ParentImage="C:\\Windows\\System32\\cmd.exe" CommandLine="powershell  -ExecutionPolicy Bypass -File .\\script.ps1"`
+`index="sysmon" EventID=1 ParentImage="C:\\Windows\\System32\\cmd.exe" CommandLine="powershell  -ExecutionPolicy Bypass -File .\\script.ps1"| table _time, Computer, User, ParentImage, CommandLine`
+Screenshot:<img width="1033" height="808" alt="image" src="https://github.com/user-attachments/assets/72628a0f-8c73-4716-a1ad-ae6c69063186" />
+
 This demonstrates how an analyst may begin investigating the use of suspicious powershell commands using specific queries based on prior investigation steps.
 
 ## Detection Query (Realistic Soc Use)
 `index="sysmon" EventID=1 Image="*\\powershell.exe"
 (
     CommandLine="*-ExecutionPolicy Bypass*" OR 
-    CommandLine="*-EncodedCommand*" OR 
     CommandLine="*-File *"
 )
 | table _time, Computer, User, ParentImage, CommandLine`
+
+Screenshot:<img width="1025" height="765" alt="image" src="https://github.com/user-attachments/assets/625eb721-c2f8-4b11-a351-f1ae68d450a8" />
+
 3. Investigation
 
 Steps for an analyst to confirm malicious activity:
