@@ -22,12 +22,13 @@ Screenshot:<img width="1033" height="808" alt="image" src="https://github.com/us
 
 This demonstrates how an analyst may begin investigating the use of suspicious powershell commands using specific queries based on prior investigation steps.
 ### Detecting Network Connections
-This demonstrates how an attacker could gather information on network connections being made by powershell and display the results so they can correlate the time of the process creation with the network connection and see what hosts were contacted and 
+This demonstrates how an attacker could gather information on network connections being made by powershell and display the results so they can correlate the time of the process creation with the network connection and see what hosts were contacted.
 `index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer, Image,DestinationIp, DestinationPort`
 <img width="1103" height="796" alt="image" src="https://github.com/user-attachments/assets/e6c4356c-5bd0-40fd-8dfe-5aedb974c6b1" />
 
 ## Detection Query (Realistic Soc Use)
 ### Detecting Process Creation
+In our lab demo we knew the ParentImage would be cmd but in a real environment there is various options an attacker can use, rather than focus on the parent image we know the image being run is powershell, we can instead focus on any events where the flags responsible for local file execution with executionpolicy bypass are present.
 `index="sysmon" EventID=1 Image="*\\powershell.exe"
 (
     CommandLine="*-ExecutionPolicy Bypass*" OR 
