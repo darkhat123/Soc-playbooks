@@ -16,12 +16,18 @@ Purpose: Provide a structured response workflow for detecting and responding to 
     EDR/SIEM alerts
 
 ## Detection Query (Lab Demo):
+### Detecting Process Creation
 `index="sysmon" EventID=1 ParentImage="C:\\Windows\\System32\\cmd.exe" CommandLine="powershell  -ExecutionPolicy Bypass -File .\\script.ps1"| table _time, Computer, User, ParentImage, CommandLine`
 Screenshot:<img width="1033" height="808" alt="image" src="https://github.com/user-attachments/assets/72628a0f-8c73-4716-a1ad-ae6c69063186" />
 
 This demonstrates how an analyst may begin investigating the use of suspicious powershell commands using specific queries based on prior investigation steps.
+### Detecting Network Connections
+This demonstrates how an attacker could gather information on network connections being made by powershell and display the results so they can correlate the time of the process creation with the network connection and see what hosts were contacted and 
+`index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer, Image,DestinationIp, DestinationPort`
+<img width="1103" height="796" alt="image" src="https://github.com/user-attachments/assets/e6c4356c-5bd0-40fd-8dfe-5aedb974c6b1" />
 
 ## Detection Query (Realistic Soc Use)
+### Detecting Process Creation
 `index="sysmon" EventID=1 Image="*\\powershell.exe"
 (
     CommandLine="*-ExecutionPolicy Bypass*" OR 
@@ -30,6 +36,9 @@ This demonstrates how an analyst may begin investigating the use of suspicious p
 | table _time, Computer, User, ParentImage, CommandLine`
 
 Screenshot:<img width="1025" height="765" alt="image" src="https://github.com/user-attachments/assets/625eb721-c2f8-4b11-a351-f1ae68d450a8" />
+
+### Detecting Network Creation
+We can use the query provided in the lab demo as a reliable query
 
 3. Investigation
 
