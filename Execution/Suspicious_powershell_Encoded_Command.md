@@ -76,11 +76,19 @@ This demonstrates how an attacker could gather information on network connection
 
 ## Detection Query (Realistic Soc Use)
 ### Detecting Process Creation
-In our lab demo we knew the ParentImage would be cmd but in a real environment there is various options an attacker can use, rather than focus on the parent image we know the image being run is powershell, we can instead focus on any events where the flags responsible for local file execution with executionpolicy bypass are present.
-`index="sysmon" EventID=1 Image="*\\powershell.exe" CommandLine="*-EncodedCommand*"
-| table _time, Computer, User, ParentImage, CommandLine`
+In our lab demo we knew the ParentImage would be cmd but in a real environment there is various options an attacker can use, rather than focus on the parent image we know the image being run is powershell, we can instead focus on any events where the flags responsible for Encoded Commands are present.
+`(index=sysmon OR index=win-event)
+(
+    (EventID=1 Image="*\\powershell.exe") 
+    OR 
+    (EventCode=4688 New_Process_Name="*\\powershell.exe")
+)
+CommandLine="*-EncodedCommand*"
+| table _time, Computer, User, ParentImage, CommandLine
+| sort _time`
 
-Screenshot:<img width="1025" height="765" alt="image" src="https://github.com/user-attachments/assets/625eb721-c2f8-4b11-a351-f1ae68d450a8" />
+Screenshot:<img width="1024" height="761" alt="image" src="https://github.com/user-attachments/assets/38a4ac06-fb88-4ea4-9162-b8d4a368a955" />
+
 
 The command can then be decoded to determine what the attacker was trying to do, with knowledge that the attacker ran a script to invoke a web request for a malicious script to be saved to disk we should see a network connection too
 <img width="1912" height="937" alt="image" src="https://github.com/user-attachments/assets/9f1c1739-5c49-4679-b1ad-dd8fdcc98386" />
