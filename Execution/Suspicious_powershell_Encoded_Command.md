@@ -1,1 +1,103 @@
+# Overview
 
+Playbook Name: Suspicious PowerShell Execution (Encoded Command)
+
+MITRE ATT&CK ID: T1059.001 – PowerShell
+
+Purpose: Provide a structured response workflow for detecting and responding to suspicious PowerShell execution attempts.
+
+# Detection
+
+## Log Sources:
+
+    Windows Event Logs (4688, 4104, 4103)
+    Sysmon Event ID 1 Process Creation
+    Sysmon Event ID 3 Network Connection
+    EDR/SIEM alerts
+
+## Detection Query (Lab Demo):
+### Detecting Process Creation - Use of EncodedCommand argument
+`index="sysmon" EventID=1 Image="*\\powershell.exe" CommandLine=*-EncodedCommand* | table _time Computer, User, CommandLine`
+Screenshot:<img width="1025" height="655" alt="image" src="https://github.com/user-attachments/assets/5039da20-47e0-4520-974f-cf3486123d17" />
+
+This shows us all commands executed by any users on the system that have the encodedcommand argument as part of their command line input
+### Detecting Network Connections
+This demonstrates how an attacker could gather information on network connections being made by powershell and display the results so they can correlate the time of the process creation with the network connection and see what hosts were contacted.
+`index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer, Image,DestinationIp, DestinationPort`
+<img width="1103" height="796" alt="image" src="https://github.com/user-attachments/assets/e6c4356c-5bd0-40fd-8dfe-5aedb974c6b1" />
+
+## Detection Query (Realistic Soc Use)
+### Detecting Process Creation
+In our lab demo we knew the ParentImage would be cmd but in a real environment there is various options an attacker can use, rather than focus on the parent image we know the image being run is powershell, we can instead focus on any events where the flags responsible for local file execution with executionpolicy bypass are present.
+`index="sysmon" EventID=1 Image="*\\powershell.exe" CommandLine="*-EncodedCommand*"
+| table _time, Computer, User, ParentImage, CommandLine`
+
+Screenshot:<img width="1025" height="765" alt="image" src="https://github.com/user-attachments/assets/625eb721-c2f8-4b11-a351-f1ae68d450a8" />
+
+The command can then be decoded to determine what the attacker was trying to do, with knowledge that the attacker ran a script to invoke a web request for a malicious script to be saved to disk we should see a network connection too
+
+### Detecting Network Creation
+We can use the query provided in the lab demo as a reliable query to detect network connections made from any powershell instances
+
+
+3. Investigation
+
+Steps for an analyst to confirm malicious activity:
+
+Review parent process (e.g., was it spawned from cmd.exe, wscript.exe, or winword.exe?).
+
+Check user context — was it an admin or a normal user?
+
+Review the full command line (especially if -EncodedCommand or suspicious IEX/Invoke expressions were used).
+
+Search for downloaded payloads or connections to external IPs.
+
+Correlate with other logs (failed logins, scheduled tasks, lateral movement).
+
+4. Containment
+
+Actions to stop the attack quickly:
+
+Kill the PowerShell process.
+
+Isolate the host from the network.
+
+Disable the compromised account if applicable.
+
+Block malicious IP/domain if identified.
+
+5. Eradication
+
+Ensure persistence and payloads are removed:
+
+Delete malicious scripts or scheduled tasks.
+
+Remove unauthorized registry modifications.
+
+Scan for malware with EDR/AV.
+
+Verify no new local admin users were created.
+
+6. Recovery
+
+Return system to a safe state:
+
+Reset passwords of affected accounts.
+
+Restore from backups if integrity is questionable.
+
+Re-enable logging and monitoring if tampered with.
+
+Reconnect host to the network after validation.
+
+7. Lessons Learned
+
+To prevent recurrence:
+
+Enable and forward PowerShell ScriptBlock Logging.
+
+Use Constrained Language Mode or WDAC/AppLocker.
+
+Require code signing for scripts in production.
+
+Train SOC analysts to look for suspicious command-line usage.
