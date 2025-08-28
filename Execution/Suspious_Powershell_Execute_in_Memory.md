@@ -46,9 +46,6 @@ Purpose: Provide a structured response workflow for detecting and responding to 
 
 - Random or suspicious filenames (e.g., script.ps1)
 
-- File extensions:
-
-    -.ps1, .vbs, .bat outside trusted repos
 
 # Detection
 
@@ -61,40 +58,42 @@ Purpose: Provide a structured response workflow for detecting and responding to 
 
 
 ## Detection Query (Lab Demo):
-### Detecting Process Creation - Use of EncodedCommand argument
-`index="sysmon" EventID=1 Image="*\\powershell.exe" CommandLine=*-EncodedCommand* | table _time Computer, User, CommandLine`
-Screenshot:<img width="1025" height="655" alt="image" src="https://github.com/user-attachments/assets/5039da20-47e0-4520-974f-cf3486123d17" />
+### Detecting Process Creation - Use of Invoke-Expression argument
+`index="sysmon" EventID=1 Image="*\\powershell.exe" CommandLine="*Invoke-Expression*" | table _time Computer, User, CommandLine`
+Screenshot:<img width="1019" height="687" alt="image" src="https://github.com/user-attachments/assets/dab79d7f-8b46-4cc0-b86f-eca24475b09d" />
 
-This shows us all commands executed by any users on the system that have the encodedcommand argument as part of their command line input
+This shows us any commands ran by users that will run in memory and can help us determine if any malware is being run in memory, this will not generate any EventID 11 file creation events but will still have EventID 3 network connnections.
+
+The command first downloads a resource into a variable which the contents of is then passed to the Invoke-Expression command which runs the content in memory and does any commands such as downloading and printing a files contents without ever actuallyt touching the disk
 
 
 ### Detecting Network Connections
 This demonstrates how an attacker could gather information on network connections being made by powershell and display the results so they can correlate the time of the process creation with the network connection and see what hosts were contacted.
 `index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer, Image,DestinationIp, DestinationPort`
-<img width="1103" height="796" alt="image" src="https://github.com/user-attachments/assets/e6c4356c-5bd0-40fd-8dfe-5aedb974c6b1" />
+<img width="1031" height="771" alt="image" src="https://github.com/user-attachments/assets/86f11b40-3580-4c2c-90ce-9d177150801a" />
+
 
 ## Detection Query (Realistic Soc Use)
 ### Detecting Process Creation
-In our lab demo we knew the ParentImage would be cmd but in a real environment there is various options an attacker can use, rather than focus on the parent image we know the image being run is powershell, we can instead focus on any events where the flags responsible for Encoded Commands are present.
-`(index=sysmon OR index=win-event)
+In our lab demo we knew the ParentImage would be cmd but in a real environment there is various options an attacker can use, rather than focus on the parent image we know the image being run is powershell, we can instead focus on any events where the flags responsible for Execution in memory are present.
+`index=sysmon OR index=win-event
 (
-    (EventID=1 Image="*\\powershell.exe") 
-    OR 
+    (EventID=1 Image="*\\powershell.exe") OR
     (EventCode=4688 New_Process_Name="*\\powershell.exe")
 )
-CommandLine="*-EncodedCommand*"
-| table _time, Computer, User, ParentImage, CommandLine
+(CommandLine="*IEX*" OR CommandLine="*Invoke-Expression*")
+| table _time, Computer, User, ParentImage, Image, CommandLine
 | sort _time`
 
-Screenshot:<img width="1024" height="761" alt="image" src="https://github.com/user-attachments/assets/38a4ac06-fb88-4ea4-9162-b8d4a368a955" />
+This looks in both the sysmon and Windows Event Viewer for events where powershell was used to run commands which will execute in memory
+Screenshot:<img width="1028" height="780" alt="image" src="https://github.com/user-attachments/assets/3f0f2832-f026-42b2-9757-429af92f0245" />
 
 
-The command can then be decoded to determine what the attacker was trying to do, with knowledge that the attacker ran a script to invoke a web request for a malicious script to be saved to disk we should see a network connection too
-<img width="1912" height="937" alt="image" src="https://github.com/user-attachments/assets/9f1c1739-5c49-4679-b1ad-dd8fdcc98386" />
+
 
 ### Detecting Network Creation
 We can use the query provided in the lab demo as a reliable query to detect network connections made from any powershell instances
-index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer, Image,DestinationIp, DestinationPort
+`index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer, Image,DestinationIp, DestinationPort`
 
 This is useful when determining the ip and port connected to at the time of the network connection, the URL can be obtained from the decoded command and will likely be a domain controlled by the attacker
 
