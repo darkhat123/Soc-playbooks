@@ -58,6 +58,7 @@ Purpose: Provide a structured response workflow for detecting and responding to 
     Windows Event Logs (4688, 4104, 4103)
     Sysmon Event ID 1 Process Creation
     Sysmon Event ID 3 Network Connection
+    Sysmon Event ID 11 File Creation
     EDR/SIEM alerts
 
 
