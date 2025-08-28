@@ -74,6 +74,13 @@ This demonstrates how an attacker could gather information on network connection
 `index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer, Image,DestinationIp, DestinationPort`
 <img width="1103" height="796" alt="image" src="https://github.com/user-attachments/assets/e6c4356c-5bd0-40fd-8dfe-5aedb974c6b1" />
 
+### Detecting File Creation
+
+Now that we know that the attackerlab user has been used to launch a powershell attack and that we know the decoded command saved a file to disk we can check for any file creations with Sysmon Event ID 11 and filter 
+for all created by powershell by the attackerlab account
+`index="sysmon" EventID=11 Image="*\\powershell.exe" User="DESKTOP-IO6MLSF\\attackerLab" | table _time User, TargetFilename`
+<img width="1002" height="684" alt="image" src="https://github.com/user-attachments/assets/3e323be3-69f4-42b2-bc5d-5fed86e03069" />
+
 ## Detection Query (Realistic Soc Use)
 ### Detecting Process Creation
 In our lab demo we knew the ParentImage would be cmd but in a real environment there is various options an attacker can use, rather than focus on the parent image we know the image being run is powershell, we can instead focus on any events where the flags responsible for Encoded Commands are present.
@@ -100,6 +107,24 @@ index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer
 This is useful when determining the ip and port connected to at the time of the network connection, the URL can be obtained from the decoded command and will likely be a domain controlled by the attacker
 
 
+### Detecting File Creations 
+`index=sysmon EventID=11
+(
+    TargetFilename="*\\AppData\\Roaming\\*.exe" OR
+    TargetFilename="*\\AppData\\Roaming\\*.ps1" OR
+    TargetFilename="*\\AppData\\Local\\Temp\\*.exe" OR
+    TargetFilename="*\\AppData\\Local\\Temp\\*.dll" OR
+    TargetFilename="*\\Windows\\Temp\\*.exe" OR
+    TargetFilename="*\\ProgramData\\*.exe" OR
+    TargetFilename="*\\Startup\\*.lnk" OR
+    TargetFilename="*\\Startup\\*.vbs"
+)
+NOT (Image="*\\Installer\\msiexec.exe")   /* filter known legit installers */
+| table _time, Computer, User, Image, TargetFilename, ProcessId`
+
+In a realistic soc environment we want to monitor all known user-writable directories for any executable files being dropped to detect any possible scripts an attacker could be adding to a computer.
+
+This looks for any PE files, powershell scripts, Windows Shortcuts and VBscript files. This can detect both executables to be used in the execution phase of the attack chain and also detects persistence techniques.
 3. Investigation
 
 Steps for an analyst to confirm malicious activity:
