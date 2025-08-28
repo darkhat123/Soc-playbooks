@@ -125,64 +125,65 @@ NOT (Image="*\\Installer\\msiexec.exe")   /* filter known legit installers */
 In a realistic soc environment we want to monitor all known user-writable directories for any executable files being dropped to detect any possible scripts an attacker could be adding to a computer.
 
 This looks for any PE files, powershell scripts, Windows Shortcuts and VBscript files. This can detect both executables to be used in the execution phase of the attack chain and also detects persistence techniques.
-3. Investigation
 
-Steps for an analyst to confirm malicious activity:
+1. Investigation
 
-Review parent process (e.g., was it spawned from cmd.exe, wscript.exe, or winword.exe?).
+- Steps for an analyst to confirm malicious activity:
 
-Check user context — was it an admin or a normal user?
+    - Review parent process (e.g., was it spawned from cmd.exe, wscript.exe, or winword.exe?).
 
-Review the full command line (especially if -EncodedCommand or suspicious IEX/Invoke expressions were used).
+    - Check user context — was it an admin or a normal user?
 
-Search for downloaded payloads or connections to external IPs.
+    - Review the full command line (especially if -EncodedCommand or suspicious IEX/Invoke expressions were used).
 
-Correlate with other logs (failed logins, scheduled tasks, lateral movement).
+    - Search for downloaded payloads or connections to external IPs.
 
-4. Containment
+- Correlate with other logs (failed logins, scheduled tasks, lateral movement).
 
-Actions to stop the attack quickly:
+2. Containment
 
-Kill the PowerShell process.
+- Actions to stop the attack quickly:
 
-Isolate the host from the network.
+    - Kill the PowerShell process.
 
-Disable the compromised account if applicable.
+    - Isolate the host from the network.
 
-Block malicious IP/domain if identified.
+    - Disable the compromised account if applicable.
 
-5. Eradication
+    -Block malicious IP/domain if identified.
 
-Ensure persistence and payloads are removed:
+3. Eradication
 
-Delete malicious scripts or scheduled tasks.
+- Ensure persistence and payloads are removed:
 
-Remove unauthorized registry modifications.
+    - Delete malicious scripts or scheduled tasks.
 
-Scan for malware with EDR/AV.
+    - Remove unauthorized registry modifications.
 
-Verify no new local admin users were created.
+    -Scan for malware with EDR/AV.
 
-6. Recovery
+    -Verify no new local admin users were created.
 
-Return system to a safe state:
+4. Recovery
 
-Reset passwords of affected accounts.
+- Return system to a safe state:
 
-Restore from backups if integrity is questionable.
+    - Reset passwords of affected accounts.
 
-Re-enable logging and monitoring if tampered with.
+    - Restore from backups if integrity is questionable.
 
-Reconnect host to the network after validation.
+    - Re-enable logging and monitoring if tampered with.
 
-7. Lessons Learned
+    - Reconnect host to the network after validation.
 
-To prevent recurrence:
+5. Lessons Learned
 
-Enable and forward PowerShell ScriptBlock Logging.
+- To prevent recurrence:
 
-Use Constrained Language Mode or WDAC/AppLocker.
+    - Enable and forward PowerShell ScriptBlock Logging.
 
-Require code signing for scripts in production.
+    - Use Constrained Language Mode or WDAC/AppLocker.
 
-Train SOC analysts to look for suspicious command-line usage.
+    - Require code signing for scripts in production.
+
+    - Train SOC analysts to look for suspicious command-line usage.
