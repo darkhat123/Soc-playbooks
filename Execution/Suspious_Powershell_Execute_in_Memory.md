@@ -85,7 +85,7 @@ In our lab demo we knew the ParentImage would be cmd but in a real environment t
 | table _time, Computer, User, ParentImage, Image, CommandLine
 | sort _time`
 
-This looks in both the sysmon and Windows Event Viewer for events where powershell was used to run commands which will execute in memory
+This looks in both the sysmon and Windows Event Viewer for events where powershell was used to run commands which will execute in memory.
 Screenshot:<img width="1028" height="780" alt="image" src="https://github.com/user-attachments/assets/3f0f2832-f026-42b2-9757-429af92f0245" />
 
 
@@ -94,6 +94,7 @@ Screenshot:<img width="1028" height="780" alt="image" src="https://github.com/us
 ### Detecting Network Creation
 We can use the query provided in the lab demo as a reliable query to detect network connections made from any powershell instances
 `index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer, Image,DestinationIp, DestinationPort`
+<img width="1021" height="364" alt="image" src="https://github.com/user-attachments/assets/2021a740-58cf-40e9-b936-4a843f60198b" />
 
 This is useful when determining the ip and port connected to at the time of the network connection, the URL can be obtained from the decoded command and will likely be a domain controlled by the attacker
 
