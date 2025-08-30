@@ -35,18 +35,21 @@ Purpose: Provide a structured response workflow for detecting and responding to 
 # Indicators of Compromise (IOCs)
 1. Process Creation (Sysmon Event ID 1, Win Event ID 4688)
 
-- cmd.exe, wscript.exe, or Office apps spawning powershell.exe
+- cmd.exe, powershell.exe, or LOL used to spawn powershell.exe
 
 - PowerShell execution with flags:
 
-    -EncodedCommand
+    -Invoke-WebRequest
 
-    -File <script.ps1>
+    -System.Net.WebClient
 
 - Suspicious command-line usage:
 
-    -Invoke-WebRequest (IWR)
-    -Invoke-Expression (IEX)
+    - Invoke-WebRequest (IWR)
+    - Invoke-Expression (IEX)
+    - certutil.exe
+    - mimikatz.exe
+  
 
 
 2. Network Connections (Sysmon Event ID 3)
@@ -59,18 +62,15 @@ Purpose: Provide a structured response workflow for detecting and responding to 
 
 
 3. Script Contents (PowerShell ScriptBlock Logging, Event ID 4104)
-
-- Base64-encoded commands or large obfuscated strings
-
-
 - Downloader behavior:
-    -Invoke-WebRequest fetching remote files
+    -Invoke-WebRequest fetching Mimikatz.exe
 
 4. File Creation (Sysmon Event ID 11)
 
-- Dropped scripts/executables in Desktop
+- Dropped Mimikatz.exe to admin account
+- Random or suspicious filenames (e.g., Mimikatz.exe)
 
-- Random or suspicious filenames (e.g., script.ps1)
+5. ProcessAccess (Sysmon Event ID 10)
 
 
 # Detection
@@ -81,25 +81,37 @@ Purpose: Provide a structured response workflow for detecting and responding to 
     Sysmon Event ID 1 Process Creation
     Sysmon Event ID 3 Network Connection
     Sysmon Event ID 11 File Creation
+    Sysmon Event ID 10 ProcessAccess
     EDR/SIEM alerts
 
 
+## Investigation Steps
+- Find downloaded files (Sysmon Event ID 1)
+- Find Created Files (Sysmon Event ID 11)
+- Find Netowrk connections to external resources (Sysmon Event ID 3)
+- Detect execution of downloaded file (Mimikatz.exe) (Sysmon Event ID 1)
+- Detect Access to lsass from the malicious image (Sysmon Event ID 10)
+- Check file reputation (Virustotal)
 ## Detection Query (Lab Demo):
 ### Detecting Process Creation (CMD to powershell - Use of Certutil.exe
 `index=sysmon EventID=1 Image="*\\certutil.exe"
-| table _time, Computer, User, ParentImage, CommandLine
+| table _time, Computer, User, ParentImage, CommandLine, Hashes
 | sort _time`
-Screenshot:<img width="1012" height="715" alt="image" src="https://github.com/user-attachments/assets/b1009df6-0195-47fc-b5e8-cb93ece257bd" />
+Screenshot:<img width="1020" height="781" alt="image" src="https://github.com/user-attachments/assets/824a6855-f6ab-480a-b7c9-fa50185b0b0c" />
+
 This will return any events detecting the use of Certutil to download files from the internet and can be useful in indentifying the staging of payloads such as downloading Mimikatz.exe before executing it
 
 The command detected shows certutil being used to download mimikatz from an external source and saving it to disk. This Will likely lead to Network Conections (Event ID 3) being made to the external resource.
+
+We can also take the hash of the file and check VirusTotal to determine its reputation.
+
 
 ### Detecting Process Creation (CMD to powershell) - Use of Invoke-WebRequest
 `index="sysmon" EventID=1 Image="*\\powershell.exe*" 
 (
     CommandLine="*Invoke-WebRequest*" OR CommandLine="*iwr*"
 )
-| table _time, Computer, User, CommandLine, ParentImage
+| table _time, Computer, User, CommandLine, ParentImage, Hashes
 | sort _time`
 Screenshot:<img width="1059" height="783" alt="image" src="https://github.com/user-attachments/assets/a89903e1-3dba-4b26-8b8f-3ca62b7d2cc5" />
 
@@ -131,7 +143,9 @@ Screenshot: <img width="1022" height="773" alt="image" src="https://github.com/u
 `index=sysmon OR index=win-event
 (EventID=1 OR EventCode=4688)
 Image="*\\mimikatz.exe*"
-| table _time, Computer, User, ParentImage, CommandLine, ProcessId`
+| table _time, Computer, User, ParentImage, CommandLine, ProcessId, Hashes`
+
+Screenshot: <img width="1020" height="761" alt="image" src="https://github.com/user-attachments/assets/6327499d-17ed-4ab0-8a94-4efa855552c7" />
 
 This will look for any executions of mimikatz.exe inclduing from CMD to powershell and in memory executions from previously spawned powershell sessions.
 
@@ -149,90 +163,198 @@ In order to detect all files created we can run a command which looks for files 
 Screenshot: <img width="1018" height="790" alt="image" src="https://github.com/user-attachments/assets/5e64f67a-c9d9-40bf-bbeb-3c02a6eeca61" />
 
 
-## Detection Query (Realistic Soc Use)
-### Detecting Process Creation
-In our lab demo we knew the ParentImage would be cmd but in a real environment there is various options an attacker can use, rather than focus on the parent image we know the image being run is powershell, we can instead focus on any events where the flags responsible for Execution in memory are present.
-`index=sysmon OR index=win-event
-(
-    (EventID=1 Image="*\\powershell.exe") OR
-    (EventCode=4688 New_Process_Name="*\\powershell.exe")
-)
-(CommandLine="*IEX*" OR CommandLine="*Invoke-Expression*")
-| table _time, Computer, User, ParentImage, Image, CommandLine
-| sort _time`
+### Detecting Process Acesss
+The `sekurlsa::logonpasswords` command in mimikatz is ran to dump the contents of the LSASS Service. LSASS is responsible for enforcing the security policy on the sytem. It handles logins, grants access tokens and manages password changes. All of these operations lead to credentials being available in the process memory of lsass.exe, this can be accessed with admin privileges and the credentials can then be dumped
 
-This looks in both the sysmon and Windows Event Viewer for events where powershell was used to run commands which will execute in memory.
-Screenshot:<img width="1028" height="780" alt="image" src="https://github.com/user-attachments/assets/3f0f2832-f026-42b2-9757-429af92f0245" />
+Query: `index=sysmon EventID=10 TargetImage="C:\\Windows\\system32\\lsass.exe" SourceImage="C:\\Users\\labadmin\\mimikatz.exe" |table SourceUser,Computer, GrantedAccess, SourceImage, TargetImage`
+Screenshot: <img width="1019" height="766" alt="image" src="https://github.com/user-attachments/assets/00a856b4-2f14-43d5-a67e-91b66547a852" />
 
+3. Investigation (Mapped to ATT&CK)
 
+- Correlate parent-child process chains
 
+- Look for abnormal spawns (winword.exe → powershell.exe, cmd.exe → certutil.exe).
 
-### Detecting Network Creation
-We can use the query provided in the lab demo as a reliable query to detect network connections made from any powershell instances
-`index="sysmon" EventID=3 Image="*\\powershell.exe" | table _time, User, Computer, Image,DestinationIp, DestinationPort`
-<img width="1021" height="364" alt="image" src="https://github.com/user-attachments/assets/2021a740-58cf-40e9-b936-4a843f60198b" />
+    - MITRE:
 
-This is useful when determining the ip and port connected to at the time of the network connection, the URL can be obtained from the decoded command and will likely be a domain controlled by the attacker
+        - T1059.001 – Command and Scripting Interpreter: PowerShell
 
+        - T1218 – Signed Binary Proxy Execution (LOLBins like certutil.exe)
 
-3. Investigation
+- Validate user context
 
-Steps for an analyst to confirm malicious activity:
+- Identify if the process ran under a privileged account.
 
-Review parent process (e.g., was it spawned from cmd.exe, wscript.exe, or winword.exe?).
+    - MITRE:
 
-Check user context — was it an admin or a normal user?
+        - T1078 – Valid Accounts
 
-Review the full command line (especially if -EncodedCommand or suspicious IEX/Invoke expressions were used).
+        - T1078.002 – Domain Accounts
 
-Search for downloaded payloads or connections to external IPs.
+- Inspect command-line arguments
 
-Correlate with other logs (failed logins, scheduled tasks, lateral movement).
+- Look for encoded or obfuscated PowerShell.
 
-4. Containment
+    - MITRE:
 
-Actions to stop the attack quickly:
+        - T1027 – Obfuscated Files or Information
 
-Kill the PowerShell process.
+        - T1059 – Command and Scripting Interpreter
 
-Isolate the host from the network.
+- Check file and network artifacts
 
-Disable the compromised account if applicable.
+    - Event ID 11 (file creation of mimikatz.exe).
 
-Block malicious IP/domain if identified.
+    - Event ID 3 (network connections for download).
 
-5. Eradication
+    - MITRE:
 
-Ensure persistence and payloads are removed:
+        - T1105 – Ingress Tool Transfer
 
-Delete malicious scripts or scheduled tasks.
+        - T1071.001 – Application Layer Protocol: Web Protocols
 
-Remove unauthorized registry modifications.
+- Look for credential access attempts
 
-Scan for malware with EDR/AV.
+    - Event ID 10 (ProcessAccess to lsass.exe).
 
-Verify no new local admin users were created.
+    - MITRE:
 
-6. Recovery
+        - T1003.001 – LSASS Memory
 
-Return system to a safe state:
+4. Containment (Mapped to ATT&CK)
 
-Reset passwords of affected accounts.
+- Process isolation (kill mimikatz.exe / PowerShell).
 
-Restore from backups if integrity is questionable.
+    - MITRE: N/A (defensive action).
 
-Re-enable logging and monitoring if tampered with.
+- Host isolation (remove from network).
 
-Reconnect host to the network after validation.
+    - MITRE: N/A (defensive action).
 
-7. Lessons Learned
+- Account lockdown (disable/reset).
 
-To prevent recurrence:
+    - MITRE (attacker side): T1078 – Valid Accounts
 
-Enable and forward PowerShell ScriptBlock Logging.
+    - Response: Stop adversary from leveraging stolen creds.
 
-Use Constrained Language Mode or WDAC/AppLocker.
+- Network controls (block IPs/domains).
 
-Require code signing for scripts in production.
+    - MITRE (attacker side):
 
-Train SOC analysts to look for suspicious command-line usage.
+        - T1071 – Application Layer Protocol
+
+        - T1090 – Proxy (if relays observed)
+
+5. Eradication (Mapped to ATT&CK)
+
+- Delete malicious binaries/scripts
+
+- Remove mimikatz.exe and staged files.
+
+    - MITRE:
+
+        - T1105 – Ingress Tool Transfer
+
+- Check persistence mechanisms (registry, scheduled tasks, services).
+
+    - MITRE:
+
+        - T1053 – Scheduled Task/Job
+
+        - T1547 – Boot or Logon Autostart Execution
+
+- Malware scanning
+
+    - Detect secondary tools (Cobalt Strike, etc.).
+
+    - MITRE:
+
+        - T1055 – Process Injection (if beacon is injected)
+
+        - T1105 – Additional payloads
+
+- Privilege checks
+
+    - Verify admin groups and local users.
+
+    - MITRE:
+
+        - T1098 – Account Manipulation
+
+6. Recovery (Mapped to ATT&CK)
+
+- Credential hygiene
+
+    - Reset passwords, rotate Kerberos keys.
+
+    - MITRE (attacker side):
+
+    - T1558 – Steal or Forge Kerberos Tickets
+
+    - T1552 – Unsecured Credentials
+
+- System restoration
+
+    - Restore clean images, patch systems.
+
+    - MITRE: Prevents reinfection using known vulnerabilities (T1190 – Exploit Public-Facing Application).
+
+- Monitoring
+    
+    - Ensure Sysmon + logging re-enabled.
+
+    - MITRE:
+
+        - T1562 – Impair Defenses
+
+- Validation
+
+    - Confirm no persistence remains.
+
+    - MITRE:
+
+        - T1547 – Persistence via Autostart
+
+        - T1053 – Scheduled Tasks
+
+7. Lessons Learned (Mapped to ATT&CK)
+
+- Logging & Monitoring Improvements
+
+    - Capture PowerShell Script Block, Sysmon IDs 1/3/10/11.
+
+        - MITRE:
+
+            - T1059.001 – PowerShell
+
+            - T1003.001 – LSASS Memory
+
+- Security Controls
+
+    - AppLocker / WDAC to block unsigned tools.
+
+    - Credential Guard to protect LSASS.
+
+        - MITRE:
+
+            - T1562 – Impair Defenses (mitigating attacker attempts to bypass).
+
+- User & SOC Training
+
+    - Spot phishing → Mimikatz delivery vector.
+
+        - MITRE:
+
+            - T1566 – Phishing
+
+            - T1204 – User Execution
+
+- Incident Simulation
+
+    - Purple team exercises against credential dumping.
+
+        - MITRE:
+
+            - T1003 – Credential Dumping
+
+            - T1555 – Credentials from Password Stores
