@@ -33,8 +33,8 @@ Sub-techniques depending on method:
 Purpose: Provide a structured response workflow for detecting and responding to downloading and executing mimikatz for Credential Access.
 
 # Indicators of Compromise (IOCs)
-1. File Hashes (Mimikatz Variants)
-   MD5: E930B05EFE23891D19BC354A4209BE3E
+1. File Hashes (Mimikatz)
+   - MD5: E930B05EFE23891D19BC354A4209BE3E
 
 3. Filenames
 
