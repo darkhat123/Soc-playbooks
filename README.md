@@ -54,4 +54,4 @@ Log Sources Ingested into Splunk
 
 3. Logs are ingested into Splunk for hunting and detection.
 
-Analyst investigates alerts and traces the attack chain.
+4. Analyst investigates alerts and traces the attack chain.
